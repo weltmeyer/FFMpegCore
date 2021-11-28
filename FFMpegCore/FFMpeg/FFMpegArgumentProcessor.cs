@@ -178,12 +178,17 @@ namespace FFMpegCore
             var match = ProgressRegex.Match(msg.Data);
             if (!match.Success) return;
 
-            var processed = TimeSpan.Parse(match.Groups[1].Value, CultureInfo.InvariantCulture);
-            _onTimeProgress?.Invoke(processed);
 
-            if (_onPercentageProgress == null || _totalTimespan == null) return;
-            var percentage = Math.Round(processed.TotalSeconds / _totalTimespan.Value.TotalSeconds * 100, 2);
-            _onPercentageProgress(percentage);
+            try
+            {
+                var processed = TimeSpan.Parse(match.Groups[1].Value, CultureInfo.InvariantCulture);//fails after 24 hrs...
+                _onTimeProgress?.Invoke(processed);
+
+                if (_onPercentageProgress == null || _totalTimespan == null) return;
+                var percentage = Math.Round(processed.TotalSeconds / _totalTimespan.Value.TotalSeconds * 100, 2);
+                _onPercentageProgress(percentage);
+            }
+            catch (OverflowException) { }
         }
     }
 }

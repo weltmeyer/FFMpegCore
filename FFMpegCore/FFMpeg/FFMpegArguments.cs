@@ -22,6 +22,7 @@ namespace FFMpegCore
         public static FFMpegArguments FromFileInput(string filePath, bool verifyExists = true, Action<FFMpegArgumentOptions>? addArguments = null) => new FFMpegArguments().WithInput(new InputArgument(verifyExists, filePath), addArguments);
         public static FFMpegArguments FromFileInput(FileInfo fileInfo, Action<FFMpegArgumentOptions>? addArguments = null) => new FFMpegArguments().WithInput(new InputArgument(fileInfo.FullName, false), addArguments);
         public static FFMpegArguments FromUrlInput(Uri uri, Action<FFMpegArgumentOptions>? addArguments = null) => new FFMpegArguments().WithInput(new InputArgument(uri.AbsoluteUri, false), addArguments);
+        public static FFMpegArguments FromCustomInput(string input, Action<FFMpegArgumentOptions>? addArguments = null) => new FFMpegArguments().WithInput(new InputArgument(input, false), addArguments);
         public static FFMpegArguments FromDeviceInput(string device, Action<FFMpegArgumentOptions>? addArguments = null) => new FFMpegArguments().WithInput(new InputDeviceArgument(device), addArguments);
         public static FFMpegArguments FromPipeInput(IPipeSource sourcePipe, Action<FFMpegArgumentOptions>? addArguments = null) => new FFMpegArguments().WithInput(new InputPipeArgument(sourcePipe), addArguments);
 
@@ -48,9 +49,19 @@ namespace FFMpegCore
             return this;
         }
 
+        private FFMpegArguments WithOutput(IOutputArgument outputArgument, Action<FFMpegArgumentOptions>? addArguments)
+        {
+            var arguments = new FFMpegArgumentOptions();
+            addArguments?.Invoke(arguments);
+            Arguments.AddRange(arguments.Arguments);
+            Arguments.Add(outputArgument);
+            return this;
+        }
+
         public FFMpegArgumentProcessor OutputToFile(string file, bool overwrite = true, Action<FFMpegArgumentOptions>? addArguments = null) => ToProcessor(new OutputArgument(file, overwrite), addArguments);
         public FFMpegArgumentProcessor OutputToFile(Uri uri, bool overwrite = true, Action<FFMpegArgumentOptions>? addArguments = null) => ToProcessor(new OutputArgument(uri.AbsolutePath, overwrite), addArguments);
         public FFMpegArgumentProcessor OutputToPipe(IPipeSink reader, Action<FFMpegArgumentOptions>? addArguments = null) => ToProcessor(new OutputPipeArgument(reader), addArguments);
+        public FFMpegArguments AddPipeOutput(IPipeSink reader, Action<FFMpegArgumentOptions>? addArguments = null) => WithOutput(new OutputPipeArgument(reader), addArguments);
 
         private FFMpegArgumentProcessor ToProcessor(IOutputArgument argument, Action<FFMpegArgumentOptions>? addArguments)
         {

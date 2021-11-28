@@ -28,7 +28,7 @@ namespace FFMpegCore
 
             var source = FFProbe.Analyse(input);
             var (arguments, outputOptions) = BuildSnapshotArguments(input, source, size, captureTime);
-            
+
             return arguments
                 .OutputToFile(output, true, outputOptions)
                 .ProcessSynchronously();
@@ -48,7 +48,7 @@ namespace FFMpegCore
 
             var source = await FFProbe.AnalyseAsync(input);
             var (arguments, outputOptions) = BuildSnapshotArguments(input, source, size, captureTime);
-            
+
             return await arguments
                 .OutputToFile(output, true, outputOptions)
                 .ProcessAsynchronously();
@@ -66,7 +66,7 @@ namespace FFMpegCore
             var source = FFProbe.Analyse(input);
             var (arguments, outputOptions) = BuildSnapshotArguments(input, source, size, captureTime);
             using var ms = new MemoryStream();
-            
+
             arguments
                 .OutputToPipe(new StreamPipeSink(ms), options => outputOptions(options
                     .ForceFormat("rawvideo")))
@@ -76,6 +76,32 @@ namespace FFMpegCore
             using var bitmap = new Bitmap(ms);
             return bitmap.Clone(new Rectangle(0, 0, bitmap.Width, bitmap.Height), bitmap.PixelFormat);
         }
+
+        /// <summary>
+        ///     Saves a 'png' thumbnail to an in-memory bitmap
+        /// </summary>
+        /// <param name="input">Source video file.</param>
+        /// <returns>Bitmap with the requested snapshot.</returns>
+        public static Bitmap DirectSnapshot(string input)
+        {
+            var arguments = FFMpegArguments
+                .FromCustomInput(input);
+            var optionsGen = (Action<FFMpegArgumentOptions>)(options => options
+                     .WithVideoCodec(VideoCodec.Png)
+                     .WithFrameOutputCount(1)
+                    );
+            using var ms = new MemoryStream();
+
+            arguments
+                .OutputToPipe(new StreamPipeSink(ms), options => optionsGen(options
+                    .ForceFormat("rawvideo")))
+                .ProcessSynchronously();
+
+            ms.Position = 0;
+            using var bitmap = new Bitmap(ms);
+            return bitmap.Clone(new Rectangle(0, 0, bitmap.Width, bitmap.Height), bitmap.PixelFormat);
+        }
+
         /// <summary>
         ///     Saves a 'png' thumbnail to an in-memory bitmap
         /// </summary>
@@ -88,7 +114,7 @@ namespace FFMpegCore
             var source = await FFProbe.AnalyseAsync(input);
             var (arguments, outputOptions) = BuildSnapshotArguments(input, source, size, captureTime);
             using var ms = new MemoryStream();
-            
+
             await arguments
                 .OutputToPipe(new StreamPipeSink(ms), options => outputOptions(options
                     .ForceFormat("rawvideo")))
@@ -105,7 +131,7 @@ namespace FFMpegCore
 
             return (FFMpegArguments
                 .FromFileInput(input, false, options => options
-                    .Seek(captureTime)), 
+                    .Seek(captureTime)),
                 options => options
                     .WithVideoCodec(VideoCodec.Png)
                     .WithFrameOutputCount(1)
@@ -116,11 +142,11 @@ namespace FFMpegCore
         {
             if (wantedSize == null || (wantedSize.Value.Height <= 0 && wantedSize.Value.Width <= 0) || source.PrimaryVideoStream == null)
                 return null;
-            
+
             var currentSize = new Size(source.PrimaryVideoStream.Width, source.PrimaryVideoStream.Height);
             if (source.PrimaryVideoStream.Rotation == 90 || source.PrimaryVideoStream.Rotation == 180)
                 currentSize = new Size(source.PrimaryVideoStream.Height, source.PrimaryVideoStream.Width);
-            
+
             if (wantedSize.Value.Width != currentSize.Width || wantedSize.Value.Height != currentSize.Height)
             {
                 if (wantedSize.Value.Width <= 0 && wantedSize.Value.Height > 0)
@@ -157,7 +183,7 @@ namespace FFMpegCore
             Speed speed = Speed.SuperFast,
             VideoSize size = VideoSize.Original,
             AudioQuality audioQuality = AudioQuality.Normal,
-            bool multithreaded = false)
+            bool multithreaded = false, string customArgs = null)
         {
             FFMpegHelper.ExtensionExceptionCheck(output, format.Extension);
             var source = FFProbe.Analyse(input);
@@ -169,53 +195,63 @@ namespace FFMpegCore
             if (outputSize.Width % 2 != 0)
                 outputSize.Width += 1;
 
-            return format.Name switch
+
+            Action<FFMpegArgumentOptions> argBuilder =
+            format.Name switch
             {
-                "mp4" => FFMpegArguments
-                    .FromFileInput(input)
-                    .OutputToFile(output, true, options => options
+                "mp4" => (Action<FFMpegArgumentOptions>)(options => options
                         .UsingMultithreading(multithreaded)
                         .WithVideoCodec(VideoCodec.LibX264)
                         .WithVideoBitrate(2400)
-                        .WithVideoFilters(filterOptions => filterOptions 
+                        .WithVideoFilters(filterOptions => filterOptions
                             .Scale(outputSize))
                         .WithSpeedPreset(speed)
                         .WithAudioCodec(AudioCodec.Aac)
                         .WithAudioBitrate(audioQuality))
-                    .ProcessSynchronously(),
-                "ogv" => FFMpegArguments
-                    .FromFileInput(input)
-                    .OutputToFile(output, true, options => options
+
+                    ,
+                "ogv" => (Action<FFMpegArgumentOptions>)(options => options
                         .UsingMultithreading(multithreaded)
                         .WithVideoCodec(VideoCodec.LibTheora)
                         .WithVideoBitrate(2400)
-                        .WithVideoFilters(filterOptions => filterOptions 
+                        .WithVideoFilters(filterOptions => filterOptions
                             .Scale(outputSize))
                         .WithSpeedPreset(speed)
                         .WithAudioCodec(AudioCodec.LibVorbis)
                         .WithAudioBitrate(audioQuality))
-                    .ProcessSynchronously(),
-                "mpegts" => FFMpegArguments
-                    .FromFileInput(input)
-                    .OutputToFile(output, true, options => options
+                    ,
+                "mpegts" => (Action<FFMpegArgumentOptions>)(options => options
                         .CopyChannel()
                         .WithBitStreamFilter(Channel.Video, Filter.H264_Mp4ToAnnexB)
                         .ForceFormat(VideoType.Ts))
-                    .ProcessSynchronously(),
-                "webm" => FFMpegArguments
-                    .FromFileInput(input)
-                    .OutputToFile(output, true, options => options
+                    ,
+                "webm" => (Action<FFMpegArgumentOptions>)(options => options
                         .UsingMultithreading(multithreaded)
                         .WithVideoCodec(VideoCodec.LibVpx)
                         .WithVideoBitrate(2400)
-                        .WithVideoFilters(filterOptions => filterOptions 
+                        .WithVideoFilters(filterOptions => filterOptions
                             .Scale(outputSize))
                         .WithSpeedPreset(speed)
                         .WithAudioCodec(AudioCodec.LibVorbis)
                         .WithAudioBitrate(audioQuality))
-                    .ProcessSynchronously(),
+                    ,
                 _ => throw new ArgumentOutOfRangeException(nameof(format))
             };
+
+            var finalArgBuilder = argBuilder;
+            if (!string.IsNullOrWhiteSpace(customArgs))
+            {
+                finalArgBuilder = (Action<FFMpegArgumentOptions>)((args) =>
+                {
+                    argBuilder(args);
+                    args.WithCustomArgument(customArgs);
+
+                });
+            }
+                return FFMpegArguments
+                        .FromFileInput(input)
+                        .OutputToFile(output, true, finalArgBuilder).ProcessSynchronously();
+
         }
 
         /// <summary>
@@ -241,7 +277,7 @@ namespace FFMpegCore
                     .UsingShortest())
                 .ProcessSynchronously();
         }
-        
+
         /// <summary>
         ///     Joins a list of video files.
         /// </summary>
@@ -323,7 +359,7 @@ namespace FFMpegCore
 
             if (uri.Scheme != "http" && uri.Scheme != "https")
                 throw new ArgumentException($"Uri: {uri.AbsoluteUri}, does not point to a valid http(s) stream.");
-            
+
             return FFMpegArguments
                 .FromUrlInput(uri)
                 .OutputToFile(output)
@@ -447,7 +483,7 @@ namespace FFMpegCore
             instance.DataReceived += (e, args) =>
             {
                 var codec = parser(args.Data);
-                if(codec != null)
+                if (codec != null)
                     if (codecs.TryGetValue(codec.Name, out var parentCodec))
                         parentCodec.Merge(codec);
                     else
@@ -494,7 +530,7 @@ namespace FFMpegCore
         {
             if (!GlobalFFOptions.Current.UseCache)
                 return GetCodecsInternal().Values.Where(x => x.Type == type).ToList().AsReadOnly();
-            return FFMpegCache.Codecs.Values.Where(x=>x.Type == type).ToList().AsReadOnly();
+            return FFMpegCache.Codecs.Values.Where(x => x.Type == type).ToList().AsReadOnly();
         }
 
         public static IReadOnlyList<Codec> GetVideoCodecs() => GetCodecs(CodecType.Video);
