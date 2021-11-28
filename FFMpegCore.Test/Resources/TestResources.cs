@@ -1,8 +1,4 @@
-﻿using System;
-using System.IO;
-using FFMpegCore.Enums;
-
-namespace FFMpegCore.Test.Resources
+﻿namespace FFMpegCore.Test.Resources
 {
     public enum AudioType
     {
@@ -24,5 +20,6 @@ namespace FFMpegCore.Test.Resources
         public static readonly string Mp3Audio = "./Resources/audio.mp3";
         public static readonly string PngImage = "./Resources/cover.png";
         public static readonly string ImageCollection = "./Resources/images";
+        public static readonly string SrtSubtitle = "./Resources/sample.srt";
     }
 }

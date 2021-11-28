@@ -5,18 +5,23 @@
     <RepositoryUrl>https://github.com/rosenbjerg/FFMpegCore</RepositoryUrl>
     <PackageProjectUrl>https://github.com/rosenbjerg/FFMpegCore</PackageProjectUrl>
     <Copyright></Copyright>
-    <Description>A .NET Standard FFMpeg/FFProbe wrapper for easily integrating media analysis and conversion into your C# applications</Description>
-    <Version>3.0.0.0</Version>
-    <AssemblyVersion>3.0.0.0</AssemblyVersion>
-    <FileVersion>3.0.0.0</FileVersion>
-    <PackageReleaseNotes>- Video filter args refactored to support multiple arguments
-- Cancel improved with timeout (thanks TFleury)
-- Basic support for webcam/mic input through InputDeviceArgument (thanks TFleury)
-- Other fixes and improvements</PackageReleaseNotes>
+    <Description>A .NET Standard FFMpeg/FFProbe wrapper for easily integrating media analysis and conversion into your .NET applications</Description>
+    <AssemblyVersion>4.0.0.0</AssemblyVersion>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageReleaseNotes>- Support for reading Disposition metadata on streams in FFProbe output (thanks alex6dj)
+- Fix for stream index in Snapshot(Async) (thanks stasokrosh)
+- Add support for frame analysis through FFProbe,GetFrames(Async) (thanks andyjmorgan)
+- Fix for subtitle burning error, when subtitle path contains special characters (thanks alex6dj)
+- Support for Audio filters (thanks alex6dj)
+- Fix FFProbe.AnalyseAsync not throwing if non-zero exit-code (thanks samburovkv)
+- Change bit_rate from int to long to support analysis of high bit-rate files (thanks zhuker) 
+- Support for specifying working directory for ffmpeg and ffprobe processes through FFOptions
+- Ensure Image instances in JoinImageSequence are disposed
+- Added ConfigureAwait(false) to prevent hanging with certain frameworks</PackageReleaseNotes>
     <LangVersion>8</LangVersion>
-    <PackageVersion>4.0.0</PackageVersion>
+    <PackageVersion>4.6.0</PackageVersion>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <Authors>Malte Rosenbjerg, Vlad Jerca</Authors>
+    <Authors>Malte Rosenbjerg, Vlad Jerca, Max Bagryantsev</Authors>
     <PackageTags>ffmpeg ffprobe convert video audio mediafile resize analyze muxing</PackageTags>
     <RepositoryType>GitHub</RepositoryType>
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
@@ -29,11 +34,14 @@
     <Content Include="FFMPEG\bin\**\*">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
+    <None Include="..\README.md" Pack="true" PackagePath="\" />
   </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="System.Drawing.Common" Version="6.0.0" />
     <PackageReference Include="System.Text.Json" Version="6.0.0" />
+    <PackageReference Include="Instances" Version="1.6.0" />
+
   </ItemGroup>
 
   <ItemGroup>

@@ -12,6 +12,7 @@ using System.Threading.Tasks;
 using FFMpegCore.Arguments;
 using FFMpegCore.Exceptions;
 using FFMpegCore.Pipes;
+using System.Threading;
 
 namespace FFMpegCore.Test
 {
@@ -71,6 +72,19 @@ namespace FFMpegCore.Test
             Assert.IsTrue(success);
         }
 
+        [TestMethod, Timeout(10000)]
+        public void Video_ToH265_MKV_Args()
+        {
+            using var outputFile = new TemporaryFile($"out.mkv");
+            
+            var success = FFMpegArguments
+                .FromFileInput(TestResources.WebmVideo)
+                .OutputToFile(outputFile, false, opt => opt
+                    .WithVideoCodec(VideoCodec.LibX265))
+                .ProcessSynchronously();
+            Assert.IsTrue(success);
+        }
+
         [DataTestMethod, Timeout(10000)]
         [DataRow(System.Drawing.Imaging.PixelFormat.Format24bppRgb)]
         [DataRow(System.Drawing.Imaging.PixelFormat.Format32bppArgb)]
@@ -85,6 +99,92 @@ namespace FFMpegCore.Test
                     .WithVideoCodec(VideoCodec.LibX264))
                 .ProcessSynchronously();
             Assert.IsTrue(success);
+        }
+
+        [TestMethod, Timeout(10000)]
+        public void Video_ToMP4_Args_Pipe_DifferentImageSizes()
+        {
+            using var outputFile = new TemporaryFile($"out{VideoType.Mp4.Extension}");
+
+            var frames = new List<IVideoFrame> 
+            {
+                BitmapSource.CreateVideoFrame(0, System.Drawing.Imaging.PixelFormat.Format24bppRgb, 255, 255, 1, 0),
+                BitmapSource.CreateVideoFrame(0, System.Drawing.Imaging.PixelFormat.Format24bppRgb, 256, 256, 1, 0)
+            };
+
+            var videoFramesSource = new RawVideoPipeSource(frames);
+            var ex = Assert.ThrowsException<FFMpegException>(() => FFMpegArguments
+              .FromPipeInput(videoFramesSource)
+              .OutputToFile(outputFile, false, opt => opt
+                  .WithVideoCodec(VideoCodec.LibX264))
+              .ProcessSynchronously());
+
+            Assert.IsInstanceOfType(ex.GetBaseException(), typeof(FFMpegStreamFormatException));
+        }
+
+
+        [TestMethod, Timeout(10000)]
+        public async Task Video_ToMP4_Args_Pipe_DifferentImageSizes_Async()
+        {
+            using var outputFile = new TemporaryFile($"out{VideoType.Mp4.Extension}");
+
+            var frames = new List<IVideoFrame>
+            {
+                BitmapSource.CreateVideoFrame(0, System.Drawing.Imaging.PixelFormat.Format24bppRgb, 255, 255, 1, 0),
+                BitmapSource.CreateVideoFrame(0, System.Drawing.Imaging.PixelFormat.Format24bppRgb, 256, 256, 1, 0)
+            };
+
+            var videoFramesSource = new RawVideoPipeSource(frames);
+            var ex = await Assert.ThrowsExceptionAsync<FFMpegException>(() => FFMpegArguments
+              .FromPipeInput(videoFramesSource)
+              .OutputToFile(outputFile, false, opt => opt
+                  .WithVideoCodec(VideoCodec.LibX264))
+              .ProcessAsynchronously());
+
+            Assert.IsInstanceOfType(ex.GetBaseException(), typeof(FFMpegStreamFormatException));
+        }
+
+        [TestMethod, Timeout(10000)]
+        public void Video_ToMP4_Args_Pipe_DifferentPixelFormats()
+        {
+            using var outputFile = new TemporaryFile($"out{VideoType.Mp4.Extension}");
+
+            var frames = new List<IVideoFrame>
+            {
+                BitmapSource.CreateVideoFrame(0, System.Drawing.Imaging.PixelFormat.Format24bppRgb, 255, 255, 1, 0),
+                BitmapSource.CreateVideoFrame(0, System.Drawing.Imaging.PixelFormat.Format32bppRgb, 255, 255, 1, 0)
+            };
+
+            var videoFramesSource = new RawVideoPipeSource(frames);
+            var ex = Assert.ThrowsException<FFMpegException>(() => FFMpegArguments
+              .FromPipeInput(videoFramesSource)
+              .OutputToFile(outputFile, false, opt => opt
+                  .WithVideoCodec(VideoCodec.LibX264))
+              .ProcessSynchronously());
+
+            Assert.IsInstanceOfType(ex.GetBaseException(), typeof(FFMpegStreamFormatException));
+        }
+
+
+        [TestMethod, Timeout(10000)]
+        public async Task Video_ToMP4_Args_Pipe_DifferentPixelFormats_Async()
+        {
+            using var outputFile = new TemporaryFile($"out{VideoType.Mp4.Extension}");
+
+            var frames = new List<IVideoFrame>
+            {
+                BitmapSource.CreateVideoFrame(0, System.Drawing.Imaging.PixelFormat.Format24bppRgb, 255, 255, 1, 0),
+                BitmapSource.CreateVideoFrame(0, System.Drawing.Imaging.PixelFormat.Format32bppRgb, 255, 255, 1, 0)
+            };
+
+            var videoFramesSource = new RawVideoPipeSource(frames);
+            var ex = await Assert.ThrowsExceptionAsync<FFMpegException>(() => FFMpegArguments
+              .FromPipeInput(videoFramesSource)
+              .OutputToFile(outputFile, false, opt => opt
+                  .WithVideoCodec(VideoCodec.LibX264))
+              .ProcessAsynchronously());
+
+            Assert.IsInstanceOfType(ex.GetBaseException(), typeof(FFMpegStreamFormatException));
         }
 
         [TestMethod, Timeout(10000)]
@@ -114,6 +214,8 @@ namespace FFMpegCore.Test
                     .ProcessAsynchronously();
             });
         }
+
+
         [TestMethod, Timeout(10000)]
         public void Video_StreamFile_OutputToMemoryStream()
         {
@@ -512,6 +614,65 @@ namespace FFMpegCore.Test
 
             await Task.Delay(300);
             cancel();
+
+            var result = await task;
+
+            var outputInfo = await FFProbe.AnalyseAsync(outputFile);
+
+            Assert.IsTrue(result);
+            Assert.IsNotNull(outputInfo);
+            Assert.AreEqual(320, outputInfo.PrimaryVideoStream!.Width);
+            Assert.AreEqual(240, outputInfo.PrimaryVideoStream.Height);
+            Assert.AreEqual("h264", outputInfo.PrimaryVideoStream.CodecName);
+            Assert.AreEqual("aac", outputInfo.PrimaryAudioStream!.CodecName);
+        }
+
+        [TestMethod, Timeout(10000)]
+        public async Task Video_Cancel_CancellationToken_Async()
+        {
+            var outputFile = new TemporaryFile("out.mp4");
+
+            var cts = new CancellationTokenSource();
+
+            var task = FFMpegArguments
+                .FromFileInput("testsrc2=size=320x240[out0]; sine[out1]", false, args => args
+                    .WithCustomArgument("-re")
+                    .ForceFormat("lavfi"))
+                .OutputToFile(outputFile, false, opt => opt
+                    .WithAudioCodec(AudioCodec.Aac)
+                    .WithVideoCodec(VideoCodec.LibX264)
+                    .WithSpeedPreset(Speed.VeryFast))
+                .CancellableThrough(cts.Token)
+                .ProcessAsynchronously(false);
+
+            await Task.Delay(300);
+            cts.Cancel();
+
+            var result = await task;
+
+            Assert.IsFalse(result);
+        }
+
+        [TestMethod, Timeout(10000)]
+        public async Task Video_Cancel_CancellationToken_Async_With_Timeout()
+        {
+            var outputFile = new TemporaryFile("out.mp4");
+
+            var cts = new CancellationTokenSource();
+
+            var task = FFMpegArguments
+                .FromFileInput("testsrc2=size=320x240[out0]; sine[out1]", false, args => args
+                    .WithCustomArgument("-re")
+                    .ForceFormat("lavfi"))
+                .OutputToFile(outputFile, false, opt => opt
+                    .WithAudioCodec(AudioCodec.Aac)
+                    .WithVideoCodec(VideoCodec.LibX264)
+                    .WithSpeedPreset(Speed.VeryFast))
+                .CancellableThrough(cts.Token, 8000)
+                .ProcessAsynchronously(false);
+
+            await Task.Delay(300);
+            cts.Cancel();
 
             var result = await task;
 

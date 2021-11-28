@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 using FFMpegCore.Exceptions;
@@ -46,7 +47,7 @@ namespace FFMpegCore.Pipes
             return $"-f rawvideo -r {FrameRate.ToString(CultureInfo.InvariantCulture)} -pix_fmt {StreamFormat} -s {Width}x{Height}";
         }
 
-        public async Task WriteAsync(System.IO.Stream outputStream, CancellationToken cancellationToken)
+        public async Task WriteAsync(Stream outputStream, CancellationToken cancellationToken)
         {
             if (_framesEnumerator.Current != null)
             {
@@ -64,7 +65,7 @@ namespace FFMpegCore.Pipes
         private void CheckFrameAndThrow(IVideoFrame frame)
         {
             if (frame.Width != Width || frame.Height != Height || frame.Format != StreamFormat)
-                throw new FFMpegException(FFMpegExceptionType.Operation, "Video frame is not the same format as created raw video stream\r\n" +
+                throw new FFMpegStreamFormatException(FFMpegExceptionType.Operation, "Video frame is not the same format as created raw video stream\r\n" +
                     $"Frame format: {frame.Width}x{frame.Height} pix_fmt: {frame.Format}\r\n" +
                     $"Stream format: {Width}x{Height} pix_fmt: {StreamFormat}");
         }
